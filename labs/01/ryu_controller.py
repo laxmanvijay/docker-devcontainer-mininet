@@ -5,6 +5,8 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
+from ryu.lib.packet import ipv4
+from ryu.lib.packet import ether_types
 
 class LearningSwitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -53,7 +55,7 @@ class LearningSwitch(app_manager.RyuApp):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
 
-        self.logger.info("src mac: %s; dst mac: %s; switch id: %s", eth.src, eth.dst, datapath.id)
+        self.logger.info("src mac: %s; dst mac: %s; switch id: %s; in_port: %s", eth.src, eth.dst, datapath.id, in_port)
 
         if datapath.id not in self.switch_forwarding_table:
             self.switch_forwarding_table[datapath.id] = {}
@@ -73,7 +75,7 @@ class LearningSwitch(app_manager.RyuApp):
                 eth_dst = eth.dst,
                 eth_src = eth.src)
 
-            self.logger.info("Added to flow table")
+            self.logger.info("Added mac to flow table")
             self.add_flow(datapath, of_proto.OFP_DEFAULT_PRIORITY, match, actions)
         else:
             self.logger.info("Mac not found, flooding")
@@ -87,3 +89,5 @@ class LearningSwitch(app_manager.RyuApp):
             actions=actions, data=data)
         
         datapath.send_msg(out)
+
+# ryu-manager ryu_controller.py

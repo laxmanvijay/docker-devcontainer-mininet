@@ -28,5 +28,6 @@ class NetworkTopo(Topo):
 
 topos = { 'mytopo': ( lambda: NetworkTopo() ) }
 
+# service openvswitch-switch start
 # mn --custom topo.py --controller remote --topo mytopo
 # ryu requires eventlet 0.30.2; pip install eventlet==0.30.2 (in docker)

@@ -1,13 +1,10 @@
 from ryu.base import app_manager
 from ryu.controller import ofp_event
-from ryu.controller.controller import Datapath
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
-from ryu import ofproto
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
-from ryu.lib.packet import ether_types
 
 class LearningSwitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -46,7 +43,7 @@ class LearningSwitch(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         msg = ev.msg
-        datapath = msg.datapath
+        datapath = msg.datapath # datapath is the switch which got the packet
 
         of_proto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -56,14 +53,17 @@ class LearningSwitch(app_manager.RyuApp):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
 
-        self.logger.info("src mac: %s; dst mac: %s", eth.src, eth.dst)
+        self.logger.info("src mac: %s; dst mac: %s; switch id: %s", eth.src, eth.dst, datapath.id)
 
-        self.switch_forwarding_table[eth.src] = in_port
+        if datapath.id not in self.switch_forwarding_table:
+            self.switch_forwarding_table[datapath.id] = {}
+        
+        self.switch_forwarding_table[datapath.id][eth.src] = in_port
 
         actions = [parser.OFPActionOutput(of_proto.OFPP_FLOOD)]
 
-        if eth.dst in self.switch_forwarding_table:
-            out_port = self.switch_forwarding_table[eth.dst]
+        if eth.dst in self.switch_forwarding_table[datapath.id]:
+            out_port = self.switch_forwarding_table[datapath.id][eth.dst]
             actions = [parser.OFPActionOutput(out_port)]
 
             self.logger.info("Mac found in table, routing to port: %s", out_port)

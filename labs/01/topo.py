@@ -1,9 +1,4 @@
 from mininet.topo import Topo
-from mininet.net import Mininet
-from mininet.node import RemoteController, OVSKernelSwitch
-from mininet.link import TCLink
-from mininet.cli import CLI
-from mininet.log import setLogLevel
 
 
 class NetworkTopo(Topo):
@@ -31,25 +26,7 @@ class NetworkTopo(Topo):
         self.addLink( s3, s1 )
         self.addLink( s3, s2 )
 
-def run():
-    topo = NetworkTopo()
-    net = Mininet(topo=topo,
-                  switch=OVSKernelSwitch,
-                  link=TCLink,
-                  controller=None)
-    net.addController(
-        'c1', 
-        controller=RemoteController, 
-        ip="127.0.0.1", 
-        port=6653,
-        protocol="OpenFLow13")
-    net.start()
-    CLI(net)
-    net.stop()
+topos = { 'mytopo': ( lambda: NetworkTopo() ) }
 
-if __name__ == '__main__':
-    setLogLevel('info')
-    run()
-
-
+# mn --custom topo.py --controller remote --topo mytopo
 # ryu requires eventlet 0.30.2; pip install eventlet==0.30.2 (in docker)

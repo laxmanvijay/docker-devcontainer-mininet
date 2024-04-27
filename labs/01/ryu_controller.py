@@ -3,15 +3,14 @@ from ryu.controller import ofp_event
 from ryu.controller.controller import Datapath
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
-from ryu.ofproto import ofproto_v1_4
-from ryu.ofproto.ofproto_v1_3_parser import OFPPacketIn
+from ryu.ofproto import ofproto_v1_3
 from ryu import ofproto
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 
 class LearningSwitch(app_manager.RyuApp):
-    OFP_VERSIONS = [ofproto_v1_4.OFP_VERSION]
+    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
         super(LearningSwitch, self).__init__(*args, **kwargs)
@@ -46,38 +45,44 @@ class LearningSwitch(app_manager.RyuApp):
     # Handle the packet_in event
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
-
-        print("enet")
-        
-        msg: OFPPacketIn = ev.msg
-        datapath: Datapath = msg.datapath
+        msg = ev.msg
+        datapath = msg.datapath
 
         of_proto = datapath.ofproto
+        parser = datapath.ofproto_parser
 
-        in_port = msg.match.fields[0].value
+        in_port = msg.match['in_port']
 
         pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocol(ethernet.ethernet)
+        eth = pkt.get_protocols(ethernet.ethernet)[0]
+
+        self.logger.info("src mac: %s; dst mac: %s", eth.src, eth.dst)
 
         self.switch_forwarding_table[eth.src] = in_port
 
-        actions = [of_proto.OFPActionOutput(of_proto.OFPP_FLOOD)]
+        actions = [parser.OFPActionOutput(of_proto.OFPP_FLOOD)]
 
         if eth.dst in self.switch_forwarding_table:
             out_port = self.switch_forwarding_table[eth.dst]
-            actions = [of_proto.OFPActionOutput(out_port)]
+            actions = [parser.OFPActionOutput(out_port)]
 
-            match = of_proto.OFPMatch(
+            self.logger.info("Mac found in table, routing to port: %s", out_port)
+
+            match = parser.OFPMatch(
                 in_port = in_port,
-                eth_dst = eth.src)
+                eth_dst = eth.dst,
+                eth_src = eth.src)
 
+            self.logger.info("Added to flow table")
             self.add_flow(datapath, of_proto.OFP_DEFAULT_PRIORITY, match, actions)
+        else:
+            self.logger.info("Mac not found, flooding")
 
         data = None
         if msg.buffer_id == of_proto.OFP_NO_BUFFER:
             data = msg.data
-
-        out = of_proto.OFPPacketOut(
+        
+        out = parser.OFPPacketOut(
             datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port,
             actions=actions, data=data)
         

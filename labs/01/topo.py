@@ -50,5 +50,11 @@ if __name__ == '__main__':
 
 # topos = { 'mytopo': ( lambda: NetworkTopo() ) }
 # service openvswitch-switch start
-# mn --custom topo.py --controller remote --topo mytopo
+# mn --custom topo.py --controller remote --topo mytopo if run directly
+# In this case, run using python3 topo.py (run ryu controller in a separate terminal)
+# To test:
+# * h1 ping h2
+# * pingall
+# * h1 ping 10.0.1.1 -c1
+# * iperf h1 h2
 # ryu requires eventlet 0.30.2; pip install eventlet==0.30.2 (in docker)

@@ -1,4 +1,9 @@
 from mininet.topo import Topo
+from mininet.net import Mininet
+from mininet.node import RemoteController, OVSKernelSwitch
+from mininet.link import TCLink
+from mininet.cli import CLI
+from mininet.log import setLogLevel
 
 class NetworkTopo(Topo):
 
@@ -18,14 +23,32 @@ class NetworkTopo(Topo):
         self.addLink( s1, h1, bw = 15, delay = 10 )
         self.addLink( s1, h2, bw = 15, delay = 10 )
 
-        self.addLink( s2, ser, bw = 15, delay = 10 )
+        self.addLink( ser, s2, bw = 15, delay = 10 )
 
-        self.addLink( router, ext, intfName2='rt-ext', params2={ 'ip' : '192.168.1.1/24' })
-        self.addLink( router, s1, intfName2='rt-s1', params2={ 'ip' : '10.0.1.1/24' } )
-        self.addLink( router, s2, intfName2='rt-s2', params2={ 'ip' : '10.0.2.1/24' } )
+        self.addLink( router, ext, intfName2='s3-ext', params2={ 'ip' : '192.168.1.1/24' })
+        self.addLink( s1, router, intfName2='s3-eth3', params2={ 'ip' : '10.0.1.1/24' } )
+        self.addLink( s2, router, intfName2='s3-eth2', params2={ 'ip' : '10.0.2.1/24' } )
 
-topos = { 'mytopo': ( lambda: NetworkTopo() ) }
+def run():
+    topo = NetworkTopo()
+    net = Mininet(topo=topo,
+                  switch=OVSKernelSwitch,
+                  link=TCLink,
+                  controller=None)
+    net.addController(
+        'c1', 
+        controller=RemoteController, 
+        ip="127.0.0.1", 
+        port=6653)
+    net.start()
+    CLI(net)
+    net.stop()
 
+if __name__ == '__main__':
+    setLogLevel('info')
+    run()
+
+# topos = { 'mytopo': ( lambda: NetworkTopo() ) }
 # service openvswitch-switch start
 # mn --custom topo.py --controller remote --topo mytopo
 # ryu requires eventlet 0.30.2; pip install eventlet==0.30.2 (in docker)

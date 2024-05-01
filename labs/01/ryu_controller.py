@@ -91,29 +91,29 @@ class LearningSwitch(app_manager.RyuApp):
         of_proto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        if ip_pkt: # layer 3 and above packets encountered # 
-            
-            self.logger.info("Executing ip logic")
-            self.logger.info("src ip: %s; dst ip: %s; src mac: %s; switch id: %s; in_port: %s", ip_pkt.src, ip_pkt.dst, eth_pkt.src, datapath.id, in_port)
-            self.logger.info("-------------------------------")
-
-            self.getLayer3PacketOut(datapath, msg, ip_pkt, eth_pkt, of_proto, parser, in_port)
-            # self.getLayer2PacketOut(datapath, msg, eth_pkt, of_proto, parser, in_port)
-        
-        elif arp_pkt: # arp discovery packet encountered
+        # datapath id check is done to prevent other switches from using router logic. It ensures the switches s1 and s2 
+        # remain dumb and perform only the layer 2 'switching' functionality.
+        if arp_pkt and datapath.id == 3: # arp discovery packet encountered
             self.logger.info("Executing arp logic")
             self.logger.info("src ip: %s; dst ip: %s; src mac: %s; switch id: %s; in_port: %s", arp_pkt.src_ip, arp_pkt.dst_ip, arp_pkt.src_mac, datapath.id, in_port)
             self.logger.info("-------------------------------")
 
             self.getARPPacketOut(datapath, msg, arp_pkt, eth_pkt, of_proto, parser, in_port)
             self.getLayer2PacketOut(datapath, msg, eth_pkt, of_proto, parser, in_port)
-        
-        else:
-            self.logger.info("Executing layer 2 logic")
-            self.logger.info("src mac: %s; dst mac: %s; switch id: %s; in_port: %s", eth_pkt.src, eth_pkt.dst, datapath.id, in_port)
+
+        if ip_pkt and datapath.id == 3: # layer 3 and above packets encountered # 
+            
+            self.logger.info("Executing ip logic")
+            self.logger.info("src ip: %s; dst ip: %s; src mac: %s; switch id: %s; in_port: %s", ip_pkt.src, ip_pkt.dst, eth_pkt.src, datapath.id, in_port)
             self.logger.info("-------------------------------")
 
-            self.getLayer2PacketOut(datapath, msg, eth_pkt, of_proto, parser, in_port)
+            self.getLayer3PacketOut(datapath, msg, ip_pkt, eth_pkt, of_proto, parser, in_port)
+        
+        self.logger.info("Executing layer 2 logic")
+        self.logger.info("src mac: %s; dst mac: %s; switch id: %s; in_port: %s", eth_pkt.src, eth_pkt.dst, datapath.id, in_port)
+        self.logger.info("-------------------------------")
+
+        self.getLayer2PacketOut(datapath, msg, eth_pkt, of_proto, parser, in_port)
 
     def getLayer3PacketOut(self, datapath, msg, ip_pkt: ipv4.ipv4, eth_pkt, of_proto, parser, in_port):
         available_routes = self.routing_table.items()

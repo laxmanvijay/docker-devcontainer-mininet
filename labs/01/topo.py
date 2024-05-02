@@ -18,16 +18,16 @@ class NetworkTopo(Topo):
 
         s1 = self.addSwitch( 's1' )
         s2 = self.addSwitch( 's2' )
-        router = self.addSwitch( 's3' )
+        s3 = self.addSwitch( 's3' )
 
         self.addLink( s1, h1, bw = 15, delay = 10 )
         self.addLink( s1, h2, bw = 15, delay = 10 )
 
         self.addLink( ser, s2, bw = 15, delay = 10 )
 
-        self.addLink( router, ext, intfName2='s3-ext', params2={ 'ip' : '192.168.1.1/24' })
-        self.addLink( s1, router, intfName2='s3-eth3', params2={ 'ip' : '10.0.1.1/24' } )
-        self.addLink( s2, router, intfName2='s3-eth2', params2={ 'ip' : '10.0.2.1/24' } )
+        self.addLink( s3, ext, intfName2='s3-ext', params2={ 'ip' : '192.168.1.1/24' })
+        self.addLink( s1, s3, intfName2='s3-eth3', params2={ 'ip' : '10.0.1.1/24' } )
+        self.addLink( s2, s3, intfName2='s3-eth2', params2={ 'ip' : '10.0.2.1/24' } )
 
 def run():
     topo = NetworkTopo()

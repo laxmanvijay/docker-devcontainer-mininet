@@ -20,6 +20,8 @@ import ipaddress
 
 class LearningSwitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    ROUTER_IDS = [3]
+    INTERNAL_IP_SUBNET = "10.0.0.0/16"
 
     def __init__(self, *args, **kwargs):
         super(LearningSwitch, self).__init__(*args, **kwargs)
@@ -91,31 +93,37 @@ class LearningSwitch(app_manager.RyuApp):
         of_proto = datapath.ofproto
         parser = datapath.ofproto_parser
 
+        # Dropping any external requests to internal hosts as per the requirement
+        if ip_pkt and ipaddress.ip_address(ip_pkt.src) not in ipaddress.ip_network(self.INTERNAL_IP_SUBNET):
+                self.logger.info("src ip address not in internal subnet; dropping")
+                return
+        
         # datapath id check is done to prevent other switches from using router logic. It ensures the switches s1 and s2 
         # remain dumb and perform only the layer 2 'switching' functionality.
-        if arp_pkt and datapath.id == 3: # arp discovery packet encountered
-            self.logger.info("Executing arp logic")
-            self.logger.info("src ip: %s; dst ip: %s; src mac: %s; switch id: %s; in_port: %s", arp_pkt.src_ip, arp_pkt.dst_ip, arp_pkt.src_mac, datapath.id, in_port)
-            self.logger.info("-------------------------------")
+        if datapath.id in self.ROUTER_IDS:
+            if arp_pkt: # arp discovery packet encountered
+                self.logger.info("Executing arp logic")
+                self.logger.info("src ip: %s; dst ip: %s; src mac: %s; switch id: %s; in_port: %s", arp_pkt.src_ip, arp_pkt.dst_ip, arp_pkt.src_mac, datapath.id, in_port)
+                self.logger.info("-------------------------------")
 
-            self.getARPPacketOut(datapath, msg, arp_pkt, eth_pkt, of_proto, parser, in_port)
-            self.getLayer2PacketOut(datapath, msg, eth_pkt, of_proto, parser, in_port)
+                self.get_arp_packet_out(datapath, msg, arp_pkt, eth_pkt, of_proto, parser, in_port)
 
-        if ip_pkt and datapath.id == 3: # layer 3 and above packets encountered # 
-            
-            self.logger.info("Executing ip logic")
-            self.logger.info("src ip: %s; dst ip: %s; src mac: %s; switch id: %s; in_port: %s", ip_pkt.src, ip_pkt.dst, eth_pkt.src, datapath.id, in_port)
-            self.logger.info("-------------------------------")
+            if ip_pkt: # layer 3 and above packets encountered # 
+                
+                self.logger.info("Executing ip logic")
+                self.logger.info("src ip: %s; dst ip: %s; src mac: %s; switch id: %s; in_port: %s", ip_pkt.src, ip_pkt.dst, eth_pkt.src, datapath.id, in_port)
 
-            self.getLayer3PacketOut(datapath, msg, ip_pkt, eth_pkt, of_proto, parser, in_port)
+                self.logger.info("-------------------------------")
+
+                self.get_ip_packet_out(datapath, msg, ip_pkt, eth_pkt, of_proto, parser, in_port)
         
         self.logger.info("Executing layer 2 logic")
         self.logger.info("src mac: %s; dst mac: %s; switch id: %s; in_port: %s", eth_pkt.src, eth_pkt.dst, datapath.id, in_port)
         self.logger.info("-------------------------------")
 
-        self.getLayer2PacketOut(datapath, msg, eth_pkt, of_proto, parser, in_port)
+        self.get_mac_packet_out(datapath, msg, eth_pkt, of_proto, parser, in_port)
 
-    def getLayer3PacketOut(self, datapath, msg, ip_pkt: ipv4.ipv4, eth_pkt, of_proto, parser, in_port):
+    def get_ip_packet_out(self, datapath, msg, ip_pkt: ipv4.ipv4, eth_pkt, of_proto, parser, in_port):
         available_routes = self.routing_table.items()
 
         # The following router implementation is based on RFC 1812 (https://datatracker.ietf.org/doc/html/rfc1812#page-85)
@@ -209,7 +217,7 @@ class LearningSwitch(app_manager.RyuApp):
         
         datapath.send_msg(out)
 
-    def getARPPacketOut(self, datapath, msg, arp_pkt: arp.arp, eth_pkt, of_proto, parser, in_port):
+    def get_arp_packet_out(self, datapath, msg, arp_pkt: arp.arp, eth_pkt, of_proto, parser, in_port):
         if self.arp_cache.get(datapath.id) == None:
             self.arp_cache[datapath.id] = {}
         
@@ -246,7 +254,7 @@ class LearningSwitch(app_manager.RyuApp):
 
             return
 
-    def getLayer2PacketOut(self, datapath, msg, eth, of_proto, parser, in_port):
+    def get_mac_packet_out(self, datapath, msg, eth, of_proto, parser, in_port):
         if datapath.id not in self.switch_forwarding_table:
             self.switch_forwarding_table[datapath.id] = {}
         

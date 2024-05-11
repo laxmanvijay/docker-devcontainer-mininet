@@ -239,7 +239,7 @@ class LearningSwitch(app_manager.RyuApp):
                     datapath = datapath,
                     arp_type = arp.ARP_REPLY,
                     actions = actions,
-                    src_mac = arp_pkt.dst_mac,
+                    src_mac = mac_for_received_ip,
                     dst_mac = arp_pkt.src_mac,
                     src_ip = arp_pkt.dst_ip,
                     dst_ip = arp_pkt.src_ip

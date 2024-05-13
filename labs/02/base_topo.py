@@ -84,8 +84,10 @@ class Graph:
         n_1 = self.nodes[self.node_names.index(n1)]
         n_2 = self.nodes[self.node_names.index(n2)]
 
-        n_1.add_edge(n_2)
+        edge = n_1.add_edge(n_2)
         n_2.add_edge(n_1)
+
+        self.edges.append(edge)
 
         for c in self.composables:
             c.add_edge(n1, n2)
@@ -107,6 +109,7 @@ class Graph:
                 break
 
         n_1.remove_edge(edge_to_remove)
+        self.edges.remove(edge_to_remove)
 
         for c in self.composables:
             c.remove_edge(n, t)

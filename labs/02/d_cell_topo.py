@@ -1,5 +1,6 @@
 from base_topo import Graph
 
+# The following implementation is based on the dcell topology paper: https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=bd2e28376aca5a8ef1cf6068a3aeb1ca6d0e1abd
 class DCellTopo(Graph):
     def __init__(self, n, l) -> None:
         super().__init__("d-cell")
@@ -18,9 +19,27 @@ class DCellTopo(Graph):
 
         self.virtual_edge_count = 0
 
+    """
+    DCell is a recursive topology. The implementation is as follows:
+    * Only at level 0, the hosts exists - Consequently, level 0 is the termination condition (base case)
+    * When level = 0,
+        * Create n hosts and attach it to the corresponding switch
+        * Append each of the host to a host_arr and return it ( used for backtracking hosts in upper levels (level > 0) )
+    * When level > 0,
+        * Recursively generate lower levels and append the output of each level to a host array
+        * Each of the lower level can be considered a virtual host
+        * Connect each of the virtual host using the following logic:
+            * Store a boolean 'connected' variable for each host
+            * Choose two non-connected hosts and connect them
+            * Set the connected variable to true
+            * Once the iteration is over, reset connected to false so that, upper layer can connect the hosts ( backtracking reinitialization )
+        * Return the temp host array
+    * Once this process is over, we get a completed n-level dcell topology
+     
+    """
     def generate_dcell_structure(self, level: int) -> None:
         if level == 0:
-            switch = self.add_node(f's_{level}_{self.switch_count}')
+            switch = self.add_node(f's_{level}_{self.switch_count}', 'switch')
             self.switch_count += 1
 
             temp_host_arr = []
@@ -52,7 +71,7 @@ class DCellTopo(Graph):
             num_of_cells_in_curr_level = num_server_in_prev_level + 1
 
             for c in range(num_of_cells_in_curr_level):
-                hosts_arr.append({c: self.generate_dcell_structure(self, level-1)})
+                hosts_arr.append({c: self.generate_dcell_structure(level-1)})
 
             for i in range(num_of_cells_in_curr_level - 1):
                 for j in range(i+1, num_of_cells_in_curr_level):
@@ -60,7 +79,8 @@ class DCellTopo(Graph):
 
             out = []
             for sublist in hosts_arr:
-                out.extend(sublist)
+                for k, v in sublist.items():
+                    out.extend(v)
             
             for i in out:
                 i['connected'] = False
@@ -69,8 +89,8 @@ class DCellTopo(Graph):
 
 
     def connect_virtual_hosts(self, v1: list[dict[str, any]], v2: list[dict[str, any]]):
-        n1 = list(filter(lambda x: x['connected'] == False, v1))[0]
-        n2 = list(filter(lambda x: x['connected'] == False, v2))[0]
+        n1 = list(filter(lambda x: x['connected'] == False, list(v1.values())[0]))[0]
+        n2 = list(filter(lambda x: x['connected'] == False, list(v2.values())[0]))[0]
 
         n1['connected'] = True
         n2['connected'] = True

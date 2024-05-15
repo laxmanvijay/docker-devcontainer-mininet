@@ -1,5 +1,6 @@
 from base_topo import Graph
 
+# The following implementation is based on the bcube paper: http://ccr.sigcomm.org/online/files/p63.pdf
 class BCubeTopo(Graph):
     def __init__(self, n, k) -> None:
         super().__init__("b-cube")
@@ -14,6 +15,11 @@ class BCubeTopo(Graph):
         
         self.switches = []
 
+    """
+    BCell is a recursive topology. The implementation is as follows:
+    * Generate hosts for the bottom layer
+    * For each layer above, connect each of the switch to the host such that the connections are n ** k distance apart.
+    """
     def generate_bcube_structure(self) -> None:
         self.create_nodes_from_array(self.hosts)
 

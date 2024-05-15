@@ -99,20 +99,18 @@ class Graph:
         
         return None
             
-    def remove_edge(self, n: str, t: str):
+    def remove_edge(self, n: Node, t: Node):
         edge_to_remove = None
-        n_1 = self.nodes[self.node_names.index(n)]
-
-        for e in n_1.edges:
-            if e.rnode.id == t and e.lnode.id == n:
+        for e in n.edges:
+            if e.rnode.id == t.id and e.lnode.id == n.id:
                 edge_to_remove = e
                 break
-
-        n_1.remove_edge(edge_to_remove)
-        self.edges.remove(edge_to_remove)
-
+                
+        if edge_to_remove:
+            n.remove_edge(edge_to_remove)
+        
         for c in self.composables:
-            c.remove_edge(n, t)
+            c.remove_edge(n.id, t.id)
 
     def create_nodes_from_array(self, node_defn_array: list) -> None:
         for n in node_defn_array:
@@ -166,6 +164,9 @@ class Graph:
 
         return dist[dst_idx]
     
+    """
+    Dijkstra's algorithm is implemented as extension of bfs wherein a priority queue is used instead of a regular stack.
+    """
     def compute_dijkstra_using_heap(self, src: Node, dst: Node = None):
         visited = set()
         priority_queue = []
@@ -197,21 +198,35 @@ class Graph:
             
         return distance, pathMap
     
+    """
+    The below function computes the path of each of the shortest path computed by dijkstra algorithm.
+    """
     def path(self, previous, node_start, node_end):
         route = []
 
         node_curr = node_end    
         while True:
             route.append(node_curr)
+            if previous.get(node_curr) == None:
+                break
+                
             if previous.get(node_curr).id == node_start.id:
                 route.append(node_start)
                 break
+
             
             node_curr = previous[node_curr]
         
         route.reverse()
         return route
     
+    """
+    Computes an all-pair dijkstra.
+    * The following algorithm is parallelised due to the stateless nature of dijkstra algorithm.
+    * It uses a parallel dictionary provided by the multithreading module.
+    * And each of the computed path is memoized in the parallel dictionary to avoid repeated computation.
+    * The processInput function is then parallelized using the Parallel construct providing a considerable speed increase.
+    """
     def compute_dijikstra_for_all_hosts(self):
         hosts = self.get_all_hosts()
 
@@ -256,6 +271,20 @@ class Graph:
         
         return hosts
 
+    """
+    Yen's algorithm computes k shortest paths and utilizes dijkstra for computing the shortest path. The algorithm is as follows:
+    * Compute the shortest path using dijkstra and store it in array A
+    * To compute the rest of the possible shortest paths,
+        * Choose a spur node from the last found shortest path
+        * Choose a path root from the last found shortest path
+        * Iterate and remove the edges which overlap in both the path root and the previously found paths.
+        * Append the edges to a temp edge array.
+        * Compute shortest path using the new graph.
+        * Append the shortest path to a array called B.
+        * Re-add all the removed edges in the graph
+        * Sort B and append the first path to A.
+        * Repeat the process until k shortest path are found. 
+    """
     def compute_yen_ksp(self, node_start: Node, node_end: Node, max_k=2):
         distances, previous = self.compute_dijkstra_using_heap(node_start)
         
@@ -266,7 +295,8 @@ class Graph:
         if not A[0]['path']: return A
         
         for k in range(1, max_k):
-            for i in range(0, len(A[-1]['path']) - 1):
+            current_path = A[-1]['path']
+            for i in range(0, len(current_path) - 1):
                 node_spur = A[-1]['path'][i]
                 path_root = A[-1]['path'][:i+1]
                 
@@ -274,7 +304,7 @@ class Graph:
                 for path_k in A:
                     curr_path = path_k['path']
                     if len(curr_path) > i and path_root == curr_path[:i+1]:
-                        self.remove_edge(curr_path[i].id, curr_path[i+1].id)
+                        self.remove_edge(curr_path[i], curr_path[i+1])
                         
                         edges_removed.append([curr_path[i], curr_path[i+1]])
                 
@@ -299,6 +329,12 @@ class Graph:
         
         return A
     
+    """
+    Computes ksp for permutation pairs in the topology.
+    * This is done using a uniform random shuffle.
+    * A simple memoization is used to avoid repeated calculations.
+    * After computing ksp, the function also determines the 8-shortest path, 8-path ecmp and 64-path ecmp
+    """
     def compute_yen_for_server_permutation_pairs(self):
         original_hosts = self.get_all_hosts()
 
@@ -308,6 +344,7 @@ class Graph:
         permuted_pairs = zip(original_hosts, shuffled_hosts)
 
         computed_paths = {}
+        eight_shortest_path = {}
         eight_ecmp = {}
         sixty_four_ecmp = {}
 
@@ -320,14 +357,18 @@ class Graph:
             
             if computed_paths.get(path_name) == None:
                 path_name = f"{h[0].id}:{h[1].id}"
+                print(f"Computing for {path_name}")
                 computed_paths[path_name] = self.compute_yen_ksp(h[0], h[1], 64)
             
+            eight_shortest_path[path_name] = computed_paths[path_name][:8]
             eight_ecmp[path_name] = self.get_ecmp_paths(h, computed_paths, 8)
             sixty_four_ecmp[path_name] = self.get_ecmp_paths(h, computed_paths, 64)
         
-        return computed_paths, eight_ecmp, sixty_four_ecmp
+        return computed_paths, eight_shortest_path, eight_ecmp, sixty_four_ecmp
 
-
+    """
+    Returns k paths which are equal to the shortest path length.
+    """
     def get_ecmp_paths(self, host_pair: tuple[Node, Node], computed_paths: dict[str, list], required_path_count: int):
         path_name = f"{host_pair[0].id}:{host_pair[1].id}"
 
@@ -351,6 +392,11 @@ class Graph:
             print("Key not found for hosts: {host_pair[0].id} and {host_pair[1].id}")
             return []
     
+    """
+    The following function estimates the betweenness centrality. 
+    Centrality is defined the number of times a vertex appears in a list of paths.
+    Betweenness centrality is the number of times a vertex appears in a list of shortest paths.
+    """
     def calculate_centrality(self, computed_paths: dict[str, list]):
         centrality_of_switches = {}
 

@@ -1,6 +1,7 @@
 from base_topo import Graph
 import numpy as np
 
+# The following implementation is based on the jellyfish topology paper: https://www.usenix.org/system/files/conference/nsdi12/nsdi12-final82.pdf
 class JellyFishTopo(Graph):
     def __init__(self, pod_count: int) -> None:
         super().__init__("jelly-fish")
@@ -19,6 +20,13 @@ class JellyFishTopo(Graph):
         self.switches = [('s_' + str(i), {'type':'switch', 'available_ports': pod_count})
                         for i in range(1, self.num_switches + 1)]
 
+    """
+    The below function generates jellyfish topology based on the following structure
+
+    * Each of the hosts are connected to a random switch
+    * Each of the switches are then interconnected randomly. For this implementation, a uniform random distribution is used.
+    * Each of the switches are connected until the number of available ports for each switch is exhausted.
+    """
     def generate_jellyfish_structure(self):
         self.create_nodes_from_array(self.hosts)
         self.create_nodes_from_array(self.switches)

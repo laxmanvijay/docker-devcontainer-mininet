@@ -23,6 +23,14 @@ class FatTreeTopo(Graph):
         self.agg_switches = [('s_a_' + str(i), {'type':'switch'})
                         for i in range(1, self.num_agg_switches + 1)]
 
+    """
+    The below function generates a fat tree topology with the following configuration:
+    * There are hosts connected to edge switches
+    * Each edge switch is connected to aggregate switches of its own pod
+    * Each aggregate switch then connects to core switches
+
+    * The aggregate switches are divided into two layers - top layer and bottom layer
+    """
     def generate_fat_tree_structure(self):
         self.create_nodes_from_array(self.hosts)
         self.create_nodes_from_array(self.core_switches)
